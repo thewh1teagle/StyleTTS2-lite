@@ -1,29 +1,29 @@
-import numpy as np
-import torch
-
+import re
+import sys
 import yaml
 from munch import Munch
 import unicodedata
-import re
-import torchaudio
+import numpy as np
+import librosa
+import noisereduce as nr
+import phonemizer
 
+import torch
+import torchaudio
 from nltk.tokenize import word_tokenize
 import nltk
 nltk.download('punkt_tab')
 
-import librosa
-import noisereduce as nr
-
 from models import ProsodyPredictor, TextEncoder, StyleEncoder
 from Modules.hifigan import Decoder
 
-
-import phonemizer
-
-# For windows bro
-from phonemizer.backend.espeak.wrapper import EspeakWrapper
-import espeakng_loader
-EspeakWrapper.set_library(espeakng_loader.get_library_path())
+if sys.platform.startswith("win"):
+    try:
+        from phonemizer.backend.espeak.wrapper import EspeakWrapper
+        import espeakng_loader
+        EspeakWrapper.set_library(espeakng_loader.get_library_path())
+    except Exception as e:
+        print(e)
 
 def espeak_phn(text, lang):
     try:
@@ -72,8 +72,8 @@ class Preprocess:
         #replace punctuation that acts like a comma or period
         #text = re.sub(r'\.{2,}', '.', text)
         text = punctuation_pattern.sub(map_to, text)
-        #remove or replace special chars except . , { } ? ' -  \ % $ &
-        text = re.sub(r'[^\w\s.,{}?\'\-\[\]\%\$\&]', ' ', text)
+        #remove or replace special chars except . , { } ? ' -  \ % $ & /
+        text = re.sub(r'[^\w\s.,{}?\'\-\[\]\%\$\&\/]', ' ', text)
         #replace consecutive whitespace chars with a single space and strip leading/trailing spaces
         text = re.sub(r'\s+', ' ', text).strip()
         return text
