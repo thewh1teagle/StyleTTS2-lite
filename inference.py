@@ -307,8 +307,16 @@ class StyleTTS2(torch.nn.Module):
             text = re.sub(lang_pattern, replacement_func, text)
 
         texts = re.split(r'(\[id_\d+\])', text) #split the text by speaker ids while keeping the ids.
-        if len(texts) <= 1:
+        if len(texts) <= 1 or bool(re.match(r'(\[id_\d+\])', texts[0])): #Add a default speaker
             texts.insert(0, default_speaker)
+        curr_id = None
+        for i in range(len(texts)): #remove consecutive ids
+            if bool(re.match(r'(\[id_\d+\])', texts[i])):
+                if texts[i]!=curr_id:
+                    curr_id = texts[i]
+                else:
+                    texts[i] = ''
+        del curr_id
         texts = list(filter(lambda x: x != '', texts))
 
         print("Generating Audio...")
