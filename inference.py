@@ -33,7 +33,7 @@ def espeak_phn(text, lang):
         print(e)
 
 # IPA Phonemizer: https://github.com/bootphon/phonemizer
-# Total including extend chars 187
+# Total including extend chars 189
 
 _pad = "$"
 _punctuation = ';:,.!?¡¿—…"«»“” '
@@ -135,9 +135,6 @@ class StyleTTS2(torch.nn.Module):
         self.style_encoder       = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim)# acoustic style encoder
 
         self.__load_models(models_path)
-
-        self.ref_s_speakers = None
-        self.speakers = None
     
     def __recursive_munch(self, d):
         if isinstance(d, dict):
@@ -274,21 +271,23 @@ class StyleTTS2(torch.nn.Module):
         
         return out.squeeze().cpu().numpy(), duration.mean()
     
-    def __get_styles(self, speakers, denoise, split_dur):
-        self.ref_s_speakers = {}
-        self.speakers = speakers
-        for id in speakers:
-            ref_s = self.__compute_style(speakers[id]['path'], denoise=denoise, split_dur=split_dur)
-            self.ref_s_speakers[id] = ref_s
-
-    def generate(self, text, speakers, avg_style=False, stabilize=False, denoise=0.3, n_merge=14, default_speaker= "[id_1]"):
+    def get_styles(self, speakers, denoise=0.3, avg_style=True):
         if avg_style:   split_dur = 3
         else:           split_dur = 0
+        styles = {}
+        for id in speakers:
+            ref_s = self.__compute_style(speakers[id]['path'], denoise=denoise, split_dur=split_dur)
+            styles[id] = {
+                'style': ref_s,
+                'path': speakers[id]['path'],
+                'lang': speakers[id]['lang'],
+                'speed': speakers[id]['speed'],
+            }
+        return styles
 
+    def generate(self, text, styles, stabilize=False, n_merge=14, default_speaker= "[id_1]"):
         if stabilize:   smooth_dur=0.2
         else:           smooth_dur=0    
-
-        self.__get_styles(speakers, denoise, split_dur)
         
         list_wav        = []
         prev_d_mean     = 0
@@ -324,8 +323,8 @@ class StyleTTS2(torch.nn.Module):
             if bool(re.match(r'(\[id_\d+\])', i)):
                 #Set up env for matched speaker
                 speaker_id = i.strip('[]')
-                current_ref_s = self.ref_s_speakers[speaker_id]
-                speed = self.speakers[speaker_id]['speed']
+                current_ref_s = styles[speaker_id]['style']
+                speed = styles[speaker_id]['speed']
                 continue
             text_norm = self.preprocess.text_preprocess(i, n_merge=n_merge)
             for sentence in text_norm:
@@ -340,7 +339,7 @@ class StyleTTS2(torch.nn.Module):
                             print(e)
                         
                 replacement_func = self.__init_replacement_func(cus_phonem)
-                phonem =  espeak_phn(sentence, self.speakers[speaker_id]['lang'])
+                phonem =  espeak_phn(sentence, styles[speaker_id]['lang'])
                 phonem = re.sub(lang_pattern, replacement_func, phonem)
 
                 wav, prev_d_mean = self.__inference(phonem, current_ref_s, speed=speed, prev_d_mean=prev_d_mean, t=smooth_dur)
