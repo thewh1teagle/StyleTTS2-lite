@@ -149,6 +149,22 @@ class StyleTTS2(torch.nn.Module):
         def replacement(match):
             return next(replacement_iter)
         return replacement
+    
+    def __replace_outliers_zscore(self, tensor, threshold=3.0, factor=0.95):
+        mean = tensor.mean()
+        std = tensor.std()
+        z = (tensor - mean) / std
+
+        # Identify outliers
+        outlier_mask = torch.abs(z) > threshold
+        # Compute replacement value, respecting sign
+        sign = torch.sign(tensor - mean)
+        replacement = mean + sign * (threshold * std * factor)
+
+        result = tensor.clone()
+        result[outlier_mask] = replacement[outlier_mask]
+
+        return result
         
     def __load_models(self, models_path):
         module_params = []
@@ -180,7 +196,7 @@ class StyleTTS2(torch.nn.Module):
         device = self.get_device.device
         denoise = min(denoise, 1)
         if split_dur != 0: split_dur = max(int(split_dur), 1)
-        max_samples = 24000*30 #max 30 seconds ref audio
+        max_samples = 24000*20 #max 20 seconds ref audio
         print("Computing the style for:", path)
         
         wave, sr = librosa.load(path, sr=24000)
@@ -248,11 +264,12 @@ class StyleTTS2(torch.nn.Module):
             duration = self.predictor.duration_proj(x) / speed
             duration = torch.sigmoid(duration).sum(axis=-1)
 
-            if prev_d_mean != 0:#Stabilize speaking speed
+            if prev_d_mean != 0:#Stabilize speaking speed between splits
                 dur_stats = torch.empty(duration.shape).normal_(mean=prev_d_mean, std=duration.std()).to(device)
             else:
                 dur_stats = torch.empty(duration.shape).normal_(mean=duration.mean(), std=duration.std()).to(device)
             duration = duration*(1-t) + dur_stats*t
+            duration[:,1:-2] = self.__replace_outliers_zscore(duration[:,1:-2]) #Normalize outlier
                 
             pred_dur = torch.round(duration.squeeze()).clamp(min=1)
             pred_aln_trg = torch.zeros(input_lengths, int(pred_dur.sum().data))
@@ -272,7 +289,7 @@ class StyleTTS2(torch.nn.Module):
         return out.squeeze().cpu().numpy(), duration.mean()
     
     def get_styles(self, speakers, denoise=0.3, avg_style=True):
-        if avg_style:   split_dur = 3
+        if avg_style:   split_dur = 2
         else:           split_dur = 0
         styles = {}
         for id in speakers:
@@ -285,9 +302,9 @@ class StyleTTS2(torch.nn.Module):
             }
         return styles
 
-    def generate(self, text, styles, stabilize=False, n_merge=14, default_speaker= "[id_1]"):
-        if stabilize:   smooth_dur=0.2
-        else:           smooth_dur=0    
+    def generate(self, text, styles, stabilize=True, n_merge=16, default_speaker= "[id_1]"):
+        if stabilize:   smooth_value=0.2
+        else:           smooth_value=0    
         
         list_wav        = []
         prev_d_mean     = 0
@@ -342,10 +359,10 @@ class StyleTTS2(torch.nn.Module):
                 phonem =  espeak_phn(sentence, styles[speaker_id]['lang'])
                 phonem = re.sub(lang_pattern, replacement_func, phonem)
 
-                wav, prev_d_mean = self.__inference(phonem, current_ref_s, speed=speed, prev_d_mean=prev_d_mean, t=smooth_dur)
+                wav, prev_d_mean = self.__inference(phonem, current_ref_s, speed=speed, prev_d_mean=prev_d_mean, t=smooth_value)
                 wav = wav[4000:-4000] #Remove weird pulse and silent tokens
                 list_wav.append(wav)
         
         final_wav = np.concatenate(list_wav)
-        final_wav = np.concatenate([np.zeros([12000]), final_wav, np.zeros([12000])], axis=0) # 0.5 second padding
+        final_wav = np.concatenate([np.zeros([4000]), final_wav, np.zeros([4000])], axis=0) # add padding
         return final_wav
