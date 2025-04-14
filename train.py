@@ -336,7 +336,11 @@ def main(config_path):
                 }
                 save_path = os.path.join(log_dir, 'current_model.pth')
                 torch.save(state, save_path)  
-            
+
+
+############################################## TEST ##############################################
+
+
         loss_test = 0
         loss_align = 0
         loss_f = 0
@@ -346,13 +350,12 @@ def main(config_path):
             iters_test = 0
             for batch_idx, batch in enumerate(val_dataloader):
                 optimizer.zero_grad()
-
                 try:
                     waves = batch[0]
                     batch = [b.to(device) for b in batch[1:]]
                     texts, input_lengths, mels, mel_input_length = batch
                     with torch.no_grad():
-                        mask = length_to_mask(mel_input_length // (2 ** n_down)).to('cuda')
+                        mask = length_to_mask(mel_input_length // (2 ** n_down)).to(device)
                         text_mask = length_to_mask(input_lengths).to(texts.device)
 
                         _, _, s2s_attn = model.text_aligner(mels, mask, texts)
@@ -370,18 +373,12 @@ def main(config_path):
                         d_gt = s2s_attn_mono.sum(axis=-1).detach()
 
                     ss = []
-                    gs = []
-
                     for bib in range(len(mel_input_length)):
                         mel_length = int(mel_input_length[bib].item())
                         mel = mels[bib, :, :mel_input_length[bib]]
-                        s = model.predictor_encoder(mel.unsqueeze(0).unsqueeze(1))
-                        ss.append(s)
                         s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
-                        gs.append(s)
-
-                    s = torch.stack(ss).squeeze()
-                    gs = torch.stack(gs).squeeze()
+                        ss.append(s)
+                    s = torch.stack(ss).squeeze()  # global prosodic styles
 
                     d, p = model.predictor(t_en, s, 
                                             input_lengths, 
@@ -391,7 +388,6 @@ def main(config_path):
                     mel_len = int(mel_input_length.min().item() / 2 - 1)
                     en = []
                     gt = []
-
                     p_en = []
                     wav = []
 
@@ -401,8 +397,8 @@ def main(config_path):
                         random_start = np.random.randint(0, mel_length - mel_len)
                         en.append(asr[bib, :, random_start:random_start+mel_len])
                         p_en.append(p[bib, :, random_start:random_start+mel_len])
-
                         gt.append(mels[bib, :, (random_start * 2):((random_start+mel_len) * 2)])
+
                         y = waves[bib][(random_start * 2) * 300:((random_start+mel_len) * 2) * 300]
                         wav.append(torch.from_numpy(y).to(device))
 
@@ -411,7 +407,8 @@ def main(config_path):
                     en = torch.stack(en)
                     p_en = torch.stack(p_en)
                     gt = torch.stack(gt).detach()
-                    s = model.predictor_encoder(gt.unsqueeze(1))
+
+                    s = model.style_encoder(gt.unsqueeze(1)) 
 
                     F0_fake, N_fake = model.predictor.F0Ntrain(p_en, s)
 
@@ -427,8 +424,6 @@ def main(config_path):
                                                _text_input[1:_text_length-1])
 
                     loss_dur /= texts.size(0)
-
-                    s = model.style_encoder(gt.unsqueeze(1))
 
                     y_rec = model.decoder(en, F0_fake, N_fake, s)
                     loss_mel = stft_loss(y_rec.squeeze(), wav.detach())
