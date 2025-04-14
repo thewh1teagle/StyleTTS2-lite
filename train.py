@@ -59,10 +59,7 @@ def main(config_path):
     epochs = config.get('epochs', 200)
     save_freq = config.get('save_freq', 2)
     log_interval = config.get('log_interval', 10)
-    saving_epoch = config.get('save_freq', 2)
-
     data_params = config.get('data_params', None)
-    sr = config['preprocess_params'].get('sr', 24000)
     train_path = data_params['train_data']
     val_path = data_params['val_data']
     root_path = data_params['root_path']
@@ -81,7 +78,7 @@ def main(config_path):
                                         root_path,
                                         min_length=min_length,
                                         batch_size=batch_size,
-                                        num_workers=3,
+                                        num_workers=2,
                                         dataset_config={},
                                         device=device)
 
@@ -93,7 +90,6 @@ def main(config_path):
                                       num_workers=0,
                                       device=device,
                                       dataset_config={})
-    
     
     # build model
     model_params = recursive_munch(config['model_params'])
@@ -112,6 +108,9 @@ def main(config_path):
 
     gl = GeneratorLoss(model.mpd, model.msd).to(device)
     dl = DiscriminatorLoss(model.mpd, model.msd).to(device)
+
+    gl = MyDataParallel(gl)
+    gl = MyDataParallel(gl)
     
     scheduler_params = {
         "max_lr": optimizer_params.lr,
@@ -326,7 +325,7 @@ def main(config_path):
                 
                 print('Time elasped:', time.time()-start_time)
 
-            if iters % 1000 == 0:
+            if iters % 2000 == 0: # Save to current_model every 2000 iters
                 state = {
                     'net':  {key: model[key].state_dict() for key in model}, 
                     'optimizer': optimizer.state_dict(),
@@ -338,9 +337,10 @@ def main(config_path):
                 torch.save(state, save_path)  
 
 
-############################################## TEST ##############################################
+############################################## EVAL ##############################################
 
 
+        print("Evaluating...")
         loss_test = 0
         loss_align = 0
         loss_f = 0
@@ -421,7 +421,7 @@ def main(config_path):
                             _s2s_trg[bib, :_text_input[bib]] = 1
                         _dur_pred = torch.sigmoid(_s2s_pred).sum(axis=1)
                         loss_dur += F.l1_loss(_dur_pred[1:_text_length-1], 
-                                               _text_input[1:_text_length-1])
+                                                _text_input[1:_text_length-1])
 
                     loss_dur /= texts.size(0)
 
