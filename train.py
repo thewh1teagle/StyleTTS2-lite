@@ -1,4 +1,5 @@
 # load packages
+import os
 import random
 import yaml
 import time
@@ -19,6 +20,13 @@ from losses import *
 from utils import *
 
 from optimizers import build_optimizer
+
+class MyDataParallel(torch.nn.DataParallel):
+    def __getattr__(self, name):
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.module, name)
         
 import logging
 from logging import StreamHandler
@@ -30,17 +38,17 @@ logger.addHandler(handler)
 
 
 @click.command()
-@click.option('-p', '--config_path', default='Configs/config.yml', type=str)
+@click.option('-p', '--config_path', default='Configs/config.yaml', type=str)
 def main(config_path):
     config = yaml.safe_load(open(config_path))
     
     log_dir = config['log_dir']
-    if not osp.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
-    shutil.copy(config_path, osp.join(log_dir, osp.basename(config_path)))
+    if not os.path.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
+    shutil.copy(config_path, os.path.join(log_dir, os.path.basename(config_path)))
     writer = SummaryWriter(log_dir + "/tensorboard")
 
     # write logs
-    file_handler = logging.FileHandler(osp.join(log_dir, 'train.log'))
+    file_handler = logging.FileHandler(os.path.join(log_dir, 'train.log'))
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter('%(levelname)s:%(asctime)s: %(message)s'))
     logger.addHandler(file_handler)
@@ -77,20 +85,25 @@ def main(config_path):
                                         dataset_config={},
                                         device=device)
 
-    # val_dataloader = build_dataloader(val_list,
-    #                                   root_path,
-    #                                   min_length=min_length,
-    #                                   batch_size=batch_size,
-    #                                   validation=True,
-    #                                   num_workers=0,
-    #                                   device=device,
-    #                                   dataset_config={})
+    val_dataloader = build_dataloader(val_list,
+                                      root_path,
+                                      min_length=min_length,
+                                      batch_size=batch_size,
+                                      validation=True,
+                                      num_workers=0,
+                                      device=device,
+                                      dataset_config={})
     
     
     # build model
     model_params = recursive_munch(config['model_params'])
     model = build_model(model_params)
     _ = [model[key].to(device) for key in model]
+
+    # DP
+    for key in model:
+        if key != "mpd" and key != "msd" and key != "wd":
+            model[key] = MyDataParallel(model[key])
 
     start_epoch = 0
     iters = 0
@@ -321,138 +334,138 @@ def main(config_path):
                     'val_loss': 0,
                     'epoch': epoch,
                 }
-                save_path = osp.join(log_dir, 'current_model.pth')
+                save_path = os.path.join(log_dir, 'current_model.pth')
                 torch.save(state, save_path)  
             
-        # loss_test = 0
-        # loss_align = 0
-        # loss_f = 0
-        # _ = [model[key].eval() for key in model]
+        loss_test = 0
+        loss_align = 0
+        loss_f = 0
+        _ = [model[key].eval() for key in model]
 
-        # with torch.no_grad():
-        #     iters_test = 0
-        #     for batch_idx, batch in enumerate(val_dataloader):
-        #         optimizer.zero_grad()
+        with torch.no_grad():
+            iters_test = 0
+            for batch_idx, batch in enumerate(val_dataloader):
+                optimizer.zero_grad()
 
-        #         try:
-        #             waves = batch[0]
-        #             batch = [b.to(device) for b in batch[1:]]
-        #             texts, input_lengths, mels, mel_input_length = batch
-        #             with torch.no_grad():
-        #                 mask = length_to_mask(mel_input_length // (2 ** n_down)).to('cuda')
-        #                 text_mask = length_to_mask(input_lengths).to(texts.device)
+                try:
+                    waves = batch[0]
+                    batch = [b.to(device) for b in batch[1:]]
+                    texts, input_lengths, mels, mel_input_length = batch
+                    with torch.no_grad():
+                        mask = length_to_mask(mel_input_length // (2 ** n_down)).to('cuda')
+                        text_mask = length_to_mask(input_lengths).to(texts.device)
 
-        #                 _, _, s2s_attn = model.text_aligner(mels, mask, texts)
-        #                 s2s_attn = s2s_attn.transpose(-1, -2)
-        #                 s2s_attn = s2s_attn[..., 1:]
-        #                 s2s_attn = s2s_attn.transpose(-1, -2)
+                        _, _, s2s_attn = model.text_aligner(mels, mask, texts)
+                        s2s_attn = s2s_attn.transpose(-1, -2)
+                        s2s_attn = s2s_attn[..., 1:]
+                        s2s_attn = s2s_attn.transpose(-1, -2)
 
-        #                 mask_ST = mask_from_lens(s2s_attn, input_lengths, mel_input_length // (2 ** n_down))
-        #                 s2s_attn_mono = maximum_path(s2s_attn, mask_ST)
+                        mask_ST = mask_from_lens(s2s_attn, input_lengths, mel_input_length // (2 ** n_down))
+                        s2s_attn_mono = maximum_path(s2s_attn, mask_ST)
 
-        #                 # encode
-        #                 t_en = model.text_encoder(texts, input_lengths, text_mask)
-        #                 asr = (t_en @ s2s_attn_mono)
+                        # encode
+                        t_en = model.text_encoder(texts, input_lengths, text_mask)
+                        asr = (t_en @ s2s_attn_mono)
 
-        #                 d_gt = s2s_attn_mono.sum(axis=-1).detach()
+                        d_gt = s2s_attn_mono.sum(axis=-1).detach()
 
-        #             ss = []
-        #             gs = []
+                    ss = []
+                    gs = []
 
-        #             for bib in range(len(mel_input_length)):
-        #                 mel_length = int(mel_input_length[bib].item())
-        #                 mel = mels[bib, :, :mel_input_length[bib]]
-        #                 s = model.predictor_encoder(mel.unsqueeze(0).unsqueeze(1))
-        #                 ss.append(s)
-        #                 s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
-        #                 gs.append(s)
+                    for bib in range(len(mel_input_length)):
+                        mel_length = int(mel_input_length[bib].item())
+                        mel = mels[bib, :, :mel_input_length[bib]]
+                        s = model.predictor_encoder(mel.unsqueeze(0).unsqueeze(1))
+                        ss.append(s)
+                        s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
+                        gs.append(s)
 
-        #             s = torch.stack(ss).squeeze()
-        #             gs = torch.stack(gs).squeeze()
+                    s = torch.stack(ss).squeeze()
+                    gs = torch.stack(gs).squeeze()
 
-        #             d, p = model.predictor(t_en, s, 
-        #                                     input_lengths, 
-        #                                     s2s_attn_mono, 
-        #                                     text_mask)
-        #             # get clips
-        #             mel_len = int(mel_input_length.min().item() / 2 - 1)
-        #             en = []
-        #             gt = []
+                    d, p = model.predictor(t_en, s, 
+                                            input_lengths, 
+                                            s2s_attn_mono, 
+                                            text_mask)
+                    # get clips
+                    mel_len = int(mel_input_length.min().item() / 2 - 1)
+                    en = []
+                    gt = []
 
-        #             p_en = []
-        #             wav = []
+                    p_en = []
+                    wav = []
 
-        #             for bib in range(len(mel_input_length)):
-        #                 mel_length = int(mel_input_length[bib].item() / 2)
+                    for bib in range(len(mel_input_length)):
+                        mel_length = int(mel_input_length[bib].item() / 2)
 
-        #                 random_start = np.random.randint(0, mel_length - mel_len)
-        #                 en.append(asr[bib, :, random_start:random_start+mel_len])
-        #                 p_en.append(p[bib, :, random_start:random_start+mel_len])
+                        random_start = np.random.randint(0, mel_length - mel_len)
+                        en.append(asr[bib, :, random_start:random_start+mel_len])
+                        p_en.append(p[bib, :, random_start:random_start+mel_len])
 
-        #                 gt.append(mels[bib, :, (random_start * 2):((random_start+mel_len) * 2)])
-        #                 y = waves[bib][(random_start * 2) * 300:((random_start+mel_len) * 2) * 300]
-        #                 wav.append(torch.from_numpy(y).to(device))
+                        gt.append(mels[bib, :, (random_start * 2):((random_start+mel_len) * 2)])
+                        y = waves[bib][(random_start * 2) * 300:((random_start+mel_len) * 2) * 300]
+                        wav.append(torch.from_numpy(y).to(device))
 
-        #             wav = torch.stack(wav).float().detach()
+                    wav = torch.stack(wav).float().detach()
 
-        #             en = torch.stack(en)
-        #             p_en = torch.stack(p_en)
-        #             gt = torch.stack(gt).detach()
-        #             s = model.predictor_encoder(gt.unsqueeze(1))
+                    en = torch.stack(en)
+                    p_en = torch.stack(p_en)
+                    gt = torch.stack(gt).detach()
+                    s = model.predictor_encoder(gt.unsqueeze(1))
 
-        #             F0_fake, N_fake = model.predictor.F0Ntrain(p_en, s)
+                    F0_fake, N_fake = model.predictor.F0Ntrain(p_en, s)
 
-        #             loss_dur = 0
-        #             for _s2s_pred, _text_input, _text_length in zip(d, (d_gt), input_lengths):
-        #                 _s2s_pred = _s2s_pred[:_text_length, :]
-        #                 _text_input = _text_input[:_text_length].long()
-        #                 _s2s_trg = torch.zeros_like(_s2s_pred)
-        #                 for bib in range(_s2s_trg.shape[0]):
-        #                     _s2s_trg[bib, :_text_input[bib]] = 1
-        #                 _dur_pred = torch.sigmoid(_s2s_pred).sum(axis=1)
-        #                 loss_dur += F.l1_loss(_dur_pred[1:_text_length-1], 
-        #                                        _text_input[1:_text_length-1])
+                    loss_dur = 0
+                    for _s2s_pred, _text_input, _text_length in zip(d, (d_gt), input_lengths):
+                        _s2s_pred = _s2s_pred[:_text_length, :]
+                        _text_input = _text_input[:_text_length].long()
+                        _s2s_trg = torch.zeros_like(_s2s_pred)
+                        for bib in range(_s2s_trg.shape[0]):
+                            _s2s_trg[bib, :_text_input[bib]] = 1
+                        _dur_pred = torch.sigmoid(_s2s_pred).sum(axis=1)
+                        loss_dur += F.l1_loss(_dur_pred[1:_text_length-1], 
+                                               _text_input[1:_text_length-1])
 
-        #             loss_dur /= texts.size(0)
+                    loss_dur /= texts.size(0)
 
-        #             s = model.style_encoder(gt.unsqueeze(1))
+                    s = model.style_encoder(gt.unsqueeze(1))
 
-        #             y_rec = model.decoder(en, F0_fake, N_fake, s)
-        #             loss_mel = stft_loss(y_rec.squeeze(), wav.detach())
+                    y_rec = model.decoder(en, F0_fake, N_fake, s)
+                    loss_mel = stft_loss(y_rec.squeeze(), wav.detach())
 
-        #             F0_real, _, F0 = model.pitch_extractor(gt.unsqueeze(1)) 
+                    F0_real, _, F0 = model.pitch_extractor(gt.unsqueeze(1)) 
 
-        #             loss_F0 = F.l1_loss(F0_real, F0_fake) / 10
+                    loss_F0 = F.l1_loss(F0_real, F0_fake) / 10
 
-        #             loss_test += (loss_mel).mean()
-        #             loss_align += (loss_dur).mean()
-        #             loss_f += (loss_F0).mean()
+                    loss_test += (loss_mel).mean()
+                    loss_align += (loss_dur).mean()
+                    loss_f += (loss_F0).mean()
 
-        #             iters_test += 1
-        #         except:
-        #             continue
+                    iters_test += 1
+                except:
+                    continue
 
-        # print('Epochs:', epoch + 1)
-        # logger.info('Validation loss: %.3f, Dur loss: %.3f, F0 loss: %.3f' % (loss_test / iters_test, loss_align / iters_test, loss_f / iters_test) + '\n\n\n')
-        # print('\n\n\n')
-        # writer.add_scalar('eval/mel_loss', loss_test / iters_test, epoch + 1)
-        # writer.add_scalar('eval/dur_loss', loss_test / iters_test, epoch + 1)
-        # writer.add_scalar('eval/F0_loss', loss_f / iters_test, epoch + 1)
+        print('Epochs:', epoch + 1)
+        logger.info('Validation loss: %.3f, Dur loss: %.3f, F0 loss: %.3f' % (loss_test / iters_test, loss_align / iters_test, loss_f / iters_test) + '\n\n\n')
+        print('\n\n\n')
+        writer.add_scalar('eval/mel_loss', loss_test / iters_test, epoch + 1)
+        writer.add_scalar('eval/dur_loss', loss_test / iters_test, epoch + 1)
+        writer.add_scalar('eval/F0_loss', loss_f / iters_test, epoch + 1)
         
         
-        # if (epoch + 1) % save_freq == 0 :
-        #     if (loss_test / iters_test) < best_loss:
-        #         best_loss = loss_test / iters_test
-        #     print('Saving..')
-        #     state = {
-        #         'net':  {key: model[key].state_dict() for key in model}, 
-        #         'optimizer': optimizer.state_dict(),
-        #         'iters': iters,
-        #         'val_loss': loss_test / iters_test,
-        #         'epoch': epoch,
-        #     }
-        #     save_path = osp.join(log_dir, 'epoch_%05d.pth' % epoch)
-        #     torch.save(state, save_path)
+        if (epoch + 1) % save_freq == 0 :
+            if (loss_test / iters_test) < best_loss:
+                best_loss = loss_test / iters_test
+            print('Saving..')
+            state = {
+                'net':  {key: model[key].state_dict() for key in model}, 
+                'optimizer': optimizer.state_dict(),
+                'iters': iters,
+                'val_loss': loss_test / iters_test,
+                'epoch': epoch,
+            }
+            save_path = os.path.join(log_dir, 'epoch_%05d.pth' % epoch)
+            torch.save(state, save_path)
 
                             
 if __name__=="__main__":
