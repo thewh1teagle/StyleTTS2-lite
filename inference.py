@@ -261,7 +261,7 @@ class StyleTTS2(torch.nn.Module):
             # cal alignment
             d = self.predictor.text_encoder(t_en, s, input_lengths, text_mask)
             x, _ = self.predictor.lstm(d)
-            duration = self.predictor.duration_proj(x) / speed
+            duration = self.predictor.duration_proj(x)
             duration = torch.sigmoid(duration).sum(axis=-1)
 
             if prev_d_mean != 0:#Stabilize speaking speed between splits
@@ -270,7 +270,9 @@ class StyleTTS2(torch.nn.Module):
                 dur_stats = torch.empty(duration.shape).normal_(mean=duration.mean(), std=duration.std()).to(device)
             duration = duration*(1-t) + dur_stats*t
             duration[:,1:-2] = self.__replace_outliers_zscore(duration[:,1:-2]) #Normalize outlier
-                
+            
+            duration /= speed
+
             pred_dur = torch.round(duration.squeeze()).clamp(min=1)
             pred_aln_trg = torch.zeros(input_lengths, int(pred_dur.sum().data))
             c_frame = 0
