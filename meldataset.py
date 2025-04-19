@@ -20,11 +20,12 @@ logger.setLevel(logging.DEBUG)
 
 import pandas as pd
 
+##########################################################
 _pad = "$"
 _punctuation = ';:,.!?¡¿—…"«»“” '
 _letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 _letters_ipa = "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
-_extend = "∫̆ăη͡123456"
+_extend = "" #ADD MORE SYMBOLS HERE
 
 # Export all symbols:
 symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa) + list(_extend)
@@ -32,6 +33,9 @@ symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa) + li
 dicts = {}
 for i in range(len((symbols))):
     dicts[symbols[i]] = i
+
+# Copy this code somewhere else then run with print(len(dicts) + 1) to check total symbols
+##########################################################
 
 class TextCleaner:
     def __init__(self, dummy=None):

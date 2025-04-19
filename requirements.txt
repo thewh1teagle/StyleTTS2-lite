@@ -1,11 +1,12 @@
-SoundFile
-torchaudio
-munch
 torch
-pydub
-pyyaml
-librosa
+torchaudio
+numpy
+PyYAML
+munch
 nltk
+librosa
+SoundFile
+pydub
 matplotlib
 accelerate
 transformers
@@ -14,7 +15,6 @@ einops-exts
 tqdm
 typing
 typing-extensions
-
 noisereduce
 phonemizer
 espeakng-loader

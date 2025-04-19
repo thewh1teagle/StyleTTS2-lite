@@ -7,7 +7,7 @@ import numpy as np
 import librosa
 import noisereduce as nr
 import phonemizer
-
+from meldataset import TextCleaner
 import torch
 import torchaudio
 from nltk.tokenize import word_tokenize
@@ -32,48 +32,17 @@ def espeak_phn(text, lang):
     except Exception as e:
         print(e)
 
-# IPA Phonemizer: https://github.com/bootphon/phonemizer
-# Total including extend chars 189
-
-_pad = "$"
-_punctuation = ';:,.!?¡¿—…"«»“” '
-_letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-_letters_ipa = "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
-_extend = "∫̆ăη͡123456"
-
-# Export all symbols:
-symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa) + list(_extend)
-
-dicts = {}
-for i in range(len((symbols))):
-    dicts[symbols[i]] = i
-
-class TextCleaner:
-    def __init__(self, dummy=None):
-        self.word_index_dictionary = dicts
-        #print(len(dicts))
-    def __call__(self, text):
-        indexes = []
-        for char in text:
-            try:
-                indexes.append(self.word_index_dictionary[char])
-            except KeyError as e:
-                #print(char)
-                continue
-        return indexes
-
 class Preprocess:
     def __text_normalize(self, text):
-        punctuation = ["，", "、", "،", ";", "(", "．", "。", "…", "!", "–", ":"]
+        punctuation = ["，", "、", "،", ";", "(", "．", "。", "…", "!", "–", ":", "?"]
         map_to = "."
         punctuation_pattern = re.compile(f"[{''.join(re.escape(p) for p in punctuation)}]")
         #ensure consistency.
         text = unicodedata.normalize('NFKC', text)
         #replace punctuation that acts like a comma or period
-        #text = re.sub(r'\.{2,}', '.', text)
         text = punctuation_pattern.sub(map_to, text)
-        #remove or replace special chars except . , { } ? ' -  \ % $ & /
-        text = re.sub(r'[^\w\s.,{}?\'\-\[\]\%\$\&\/]', ' ', text)
+        #remove or replace special chars except . , { } % $ & ' -  \ /
+        text = re.sub(r'[^\w\s.,{}%$&\'\-\[\]\/]', ' ', text)
         #replace consecutive whitespace chars with a single space and strip leading/trailing spaces
         text = re.sub(r'\s+', ' ', text).strip()
         return text
@@ -211,7 +180,7 @@ class StyleTTS2(torch.nn.Module):
             audio = audio*(1-denoise) + audio_denoise*denoise
 
         with torch.no_grad():
-            if split_dur>0 and len(audio)/sr>split_dur:
+            if split_dur>0 and len(audio)/sr>=4: #Only effective if audio length is >= 4s
                 #This option will split the ref audio to multiple parts, calculate styles and average them
                 count = 0
                 ref_s = None

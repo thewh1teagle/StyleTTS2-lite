@@ -1,18 +1,17 @@
-log_dir: "Models/Finetune_Extend"
+log_dir: ./Models/Finetune
 save_freq: 1
 log_interval: 5
-device: "cuda"
+device: cuda
 epochs: 50 
-batch_size: 3
-max_len: 210 # maximum number of frames
-pretrained_model: "Models/Finetune_Extend/current_model.pth"
-load_only_params: false # set to true if do not want to load epoch numbers and optimizer parameters
+batch_size: 2
+max_len: 310 # maximum number of frames
+pretrained_model: ./Models/Finetune/base_model.pth
+load_only_params: true # set to true if do not want to load epoch numbers and optimizer parameters
 
 data_params:
-  train_data: "../../Data_Speech/viVoice/train.txt" 
-  val_data: "../../Data_Speech/combine/combine_val.txt"
-  root_path: "../../Data_Speech/"
-  min_length: 50 # sample until texts with this size are obtained for OOD texts
+  train_data: ../../Data_Speech/LibriTTS/train.txt
+  val_data: ../../Data_Speech/LibriTTS/val.txt
+  root_path: ../../Data_Speech/
 
 preprocess_params:
   sr: 24000
@@ -28,7 +27,7 @@ model_params:
   n_layer: 3
   n_mels: 80
 
-  n_token: 189 # number of phoneme tokens
+  n_token: 178 # number of phoneme tokens
   max_dur: 50 # maximum duration of a single phoneme
   style_dim: 128 # style vector size
   
@@ -37,7 +36,7 @@ model_params:
   ASR_params:
     input_dim: 80
     hidden_dim: 256
-    n_token: 189 # number of phoneme tokens
+    n_token: 178 # number of phoneme tokens
     n_layers: 6
     token_embedding_dim: 512
 

@@ -576,19 +576,36 @@ def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_module
     params = state['net']
 
     for key in model:
+        loaded_keys = list(params[key].keys())
+        loaded_has_module = loaded_keys[0].startswith('module.')
+        model_keys = list(model[key].state_dict().keys())
+        model_has_module = model_keys[0].startswith('module.')
+
         if key in params and key not in ignore_modules:
             print('%s loaded' % key)
             try:
                 model[key].load_state_dict(params[key], strict=True)
-            except:
+            except Exception as e:
                 from collections import OrderedDict
                 state_dict = params[key]
                 new_state_dict = OrderedDict()
-                for k, v in state_dict.items():
-                    name = k[7:] # remove `module.`
-                    new_state_dict[name] = v
-                # load params
-                model[key].load_state_dict(new_state_dict, strict=False)
+                if not loaded_has_module and model_has_module:
+                    print("Loading non-DP weights into DP model")
+                    #Add module
+                    for k, v in state_dict.items():
+                        # If key already has module. leave it otherwise add it
+                        new_key = k if k.startswith('module.') else 'module.' + k
+                        new_state_dict[new_key] = v
+                    model[key].load_state_dict(new_state_dict, strict=True)# load params
+                elif loaded_has_module and not model_has_module:
+                    print("Loading DP weights into non-DP model")
+                    #Remove module
+                    for k, v in state_dict.items():
+                        name = k[7:] # remove `module.`
+                        new_state_dict[name] = v
+                    model[key].load_state_dict(new_state_dict, strict=True)# load params
+                else:
+                    print(e)
     _ = [model[key].eval() for key in model]
 
     if not load_only_params:
