@@ -1,11 +1,13 @@
+# StyleTTS2-lite
+
 ## Base Model
 
 The base model is initialized from StyleTTS2 (LibriTTS) and then fine‑tuned after removing some components. This checkpoint has only been trained on LibriTTS for ~30k steps, it still needs more training.
 
-- **Download the current checkpoint:** [Download](<BASE_MODEL_CHECKPOINT_LINK>)  
+- **Download the current checkpoint:** [Download](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main)  
   _If you have a better checkpoint, your contribution would be greatly appreciated!_
 
-- **LibriTTS dataset (for fine‑tuning base model):** [Download](<LIBRITTS_DATASET_LINK>)
+- **LibriTTS dataset (for fine‑tuning base model):** [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main)
 
 Model Component Parameter Summary
 
@@ -28,16 +30,20 @@ Model Component Parameter Summary
 ```bash
 pip  install  -r  requirements.txt
 ```
-**2. Prepare your data in the same format as StyleTTS2, but omit speaker_id fields.**
+**2. Format your data like StyleTTS2, but exclude the speaker field.**
+
+Format: filename.wav | transcription
+
+For reference, see val.txt in [LibriTTS dataset](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main).
 
 **3. (Optional) Extend the token set**
 
 If you want to add new tokens to train on another language:
-- Place the base model weights in ./Models and the corresponding config file in ./Configs. 
+- Place the base model weights in ***./Models/Finetune*** and the corresponding config file in ***./Configs***. 
 - Open extend.ipynb, edit the number of tokens you would like to extend to and run the notebook.
-- Find the new weights and configs in ./Extend/New_Weights/, then replace the originals.
+- Find the new weights and configs in ***./Extend/New_Weights/***, then replace the originals.
 - Add your new IPA symbols to the _extend list in meldataset.py ⚠️ Ensure the total number of symbols in meldataset.py matches your extended token count!
-- (Optional) If you are using my inference.py on HuggingFace make sure to update it with new IPA list.
+- (Note) If you are using my **inference.py from StyleTTS2-lite-vi on HuggingFace** make sure to update it with new IPA list as well.
 
 **4. Adjust your configs file**
 
