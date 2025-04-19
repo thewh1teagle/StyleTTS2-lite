@@ -41,12 +41,19 @@ If you want to add new tokens to train on another language:
 
 **4. Adjust your configs file**
 
-For a single GPU with 24 GB VRAM, i find the following works well:
+For a single GPU with 24 GB VRAM, i find the following works well. Some users have reported that setting max_len below 300 can slightly degrade quality. Personally, I haven’t encountered any issues even with max_len 180.
 <pre lang="yaml">
 batch_size: 2 
 max_len: 310 # maximum number of frames
 </pre>
-Note: Some users have reported that setting max_len below 300 can slightly degrade quality. Personally, I haven’t encountered any issues even with max_len 180.
+
+Change the location of your dataset. For example:
+<pre lang="yaml">
+data_params:
+  train_data: ../../Data_Speech/LibriTTS/train.txt
+  val_data: ../../Data_Speech/LibriTTS/val.txt
+  root_path: ../../Data_Speech/
+</pre>
 
 **5. Start training**
 ```bash
