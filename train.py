@@ -63,7 +63,6 @@ def main(config_path):
     train_path = data_params['train_data']
     val_path = data_params['val_data']
     root_path = data_params['root_path']
-    min_length = data_params['min_length']
 
     max_len = config.get('max_len', 200)
     
@@ -76,7 +75,6 @@ def main(config_path):
 
     train_dataloader = build_dataloader(train_list,
                                         root_path,
-                                        min_length=min_length,
                                         batch_size=batch_size,
                                         num_workers=2,
                                         dataset_config={},
@@ -84,7 +82,6 @@ def main(config_path):
 
     val_dataloader = build_dataloader(val_list,
                                       root_path,
-                                      min_length=min_length,
                                       batch_size=batch_size,
                                       validation=True,
                                       num_workers=0,

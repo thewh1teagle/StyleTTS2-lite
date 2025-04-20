@@ -77,8 +77,7 @@ class FilePathDataset(torch.utils.data.Dataset):
                  root_path,
                  sr=24000,
                  data_augmentation=False,
-                 validation=False,
-                 min_length=50,
+                 validation=False
                  ):
 
         spect_params = SPECT_PARAMS
@@ -96,8 +95,6 @@ class FilePathDataset(torch.utils.data.Dataset):
         self.mean, self.std = -4, 4
         self.data_augmentation = data_augmentation and (not validation)
         self.max_mel_length = 192
-        
-        self.min_length = min_length
         
         self.root_path = root_path
 
@@ -202,14 +199,13 @@ class Collater(object):
 def build_dataloader(path_list,
                      root_path,
                      validation=False,
-                     min_length=50,
                      batch_size=4,
                      num_workers=1,
                      device='cpu',
                      collate_config={},
                      dataset_config={}):
     
-    dataset = FilePathDataset(path_list, root_path, min_length=min_length, validation=validation, **dataset_config)
+    dataset = FilePathDataset(path_list, root_path, validation=validation, **dataset_config)
     collate_fn = Collater(**collate_config)
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,
