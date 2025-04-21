@@ -317,6 +317,12 @@ def main(config_path):
                 writer.add_scalar('train/dur_loss', loss_dur, iters)
                 writer.add_scalar('train/norm_loss', loss_norm_rec, iters)
                 writer.add_scalar('train/F0_loss', loss_F0_rec, iters)
+
+                # write sample wav
+                sample_wave = wav[0].detach().cpu()
+                # Normalize between -1 and 1
+                sample_wave = sample_wave / sample_wave.abs().max()
+                writer.add_audio('train/sample_audio', sample_wave, iters, sample_rate=24000)
                 
                 running_loss = 0
                 
