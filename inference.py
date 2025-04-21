@@ -273,7 +273,7 @@ class StyleTTS2(torch.nn.Module):
             }
         return styles
 
-    def generate(self, text, styles, stabilize=True, n_merge=16, default_speaker= "[id_1]"):
+    def generate(self, text, styles, stabilize=True, n_merge=16, default_speaker= "[id_1]", is_phonemes = False):
         if stabilize:   smooth_value=0.2
         else:           smooth_value=0    
         
@@ -314,7 +314,7 @@ class StyleTTS2(torch.nn.Module):
                 current_ref_s = styles[speaker_id]['style']
                 speed = styles[speaker_id]['speed']
                 continue
-            text_norm = self.preprocess.text_preprocess(i, n_merge=n_merge)
+            text_norm = [i] if is_phonemes else self.preprocess.text_preprocess(i, n_merge=n_merge)
             for sentence in text_norm:
                 cus_phonem = []
                 find_lang_tokens = re.findall(lang_pattern, sentence)
@@ -327,7 +327,7 @@ class StyleTTS2(torch.nn.Module):
                             print(e)
                         
                 replacement_func = self.__init_replacement_func(cus_phonem)
-                phonem =  espeak_phn(sentence, styles[speaker_id]['lang'])
+                phonem = sentence if is_phonemes else espeak_phn(sentence, styles[speaker_id]['lang'])
                 phonem = re.sub(lang_pattern, replacement_func, phonem)
 
                 wav, prev_d_mean = self.__inference(phonem, current_ref_s, speed=speed, prev_d_mean=prev_d_mean, t=smooth_value)

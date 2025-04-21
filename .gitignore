@@ -1,1 +1,9 @@
 __pycache__
+
+**/wav/*.wav
+*.zip
+train.txt
+val.txt
+metadata.txt
+text.json
+Configs/config.yaml
