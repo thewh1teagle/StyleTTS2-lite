@@ -1,12 +1,9 @@
 import re
-import sys
 import yaml
 from munch import Munch
-import unicodedata
 import numpy as np
 import librosa
 import noisereduce as nr
-import phonemizer
 from meldataset import TextCleaner
 import torch
 import torchaudio
@@ -17,32 +14,13 @@ nltk.download('punkt_tab')
 from models import ProsodyPredictor, TextEncoder, StyleEncoder
 from Modules.hifigan import Decoder
 
-if sys.platform.startswith("win"):
-    try:
-        from phonemizer.backend.espeak.wrapper import EspeakWrapper
-        import espeakng_loader
-        EspeakWrapper.set_library(espeakng_loader.get_library_path())
-    except Exception as e:
-        print(e)
-
-def espeak_phn(text, lang):
-    try:
-        my_phonemizer = phonemizer.backend.EspeakBackend(language=lang, preserve_punctuation=True,  with_stress=True, language_switch='remove-flags')
-        return my_phonemizer.phonemize([text])[0]
-    except Exception as e:
-        print(e)
-
 class Preprocess:
     def __text_normalize(self, text):
         punctuation = ["，", "、", "،", ";", "(", "．", "。", "…", "!", "–", ":", "?"]
         map_to = "."
         punctuation_pattern = re.compile(f"[{''.join(re.escape(p) for p in punctuation)}]")
-        #ensure consistency.
-        text = unicodedata.normalize('NFKC', text)
         #replace punctuation that acts like a comma or period
         text = punctuation_pattern.sub(map_to, text)
-        #remove or replace special chars except . , { } % $ & ' -  \ /
-        text = re.sub(r'[^\w\s.,{}%$&\'\-\[\]\/]', ' ', text)
         #replace consecutive whitespace chars with a single space and strip leading/trailing spaces
         text = re.sub(r'\s+', ' ', text).strip()
         return text
@@ -71,7 +49,7 @@ class Preprocess:
         mel_tensor = (torch.log(1e-5 + mel_tensor.unsqueeze(0)) - mean) / std
         return mel_tensor
     def text_preprocess(self, text, n_merge=12):
-        text_norm = self.__text_normalize(text).replace(",", ".").split(".")#split.
+        text_norm = self.__text_normalize(text).split(".")#split by sentences.
         text_norm = [s.strip() for s in text_norm]
         text_norm = list(filter(lambda x: x != '', text_norm)) #filter empty index
         text_norm = self.__merge_fragments(text_norm, n=n_merge) #merge if a sentence has less that n 
@@ -112,12 +90,6 @@ class StyleTTS2(torch.nn.Module):
             return [self.__recursive_munch(v) for v in d]
         else:
             return d
-        
-    def __init_replacement_func(self, replacements):
-        replacement_iter = iter(replacements)
-        def replacement(match):
-            return next(replacement_iter)
-        return replacement
     
     def __replace_outliers_zscore(self, tensor, threshold=3.0, factor=0.95):
         mean = tensor.mean()
@@ -194,7 +166,7 @@ class StyleTTS2(torch.nn.Module):
                 for i in range(jump, total_len, jump):
                     if i+jump >= total_len:
                         left_dur = (total_len-i)/sr
-                        if left_dur >= 0.5: #Still count if left over dur is >= 0.5s
+                        if left_dur >= 1: #Still count if left over dur is >= 1s
                             mel_tensor = self.preprocess.wave_preprocess(audio[i:total_len]).to(device)
                             ref_s += self.style_encoder(mel_tensor.unsqueeze(1))
                             count += 1
@@ -259,80 +231,31 @@ class StyleTTS2(torch.nn.Module):
         
         return out.squeeze().cpu().numpy(), duration.mean()
     
-    def get_styles(self, speakers, denoise=0.3, avg_style=True):
-        if avg_style:   split_dur = 2
+    def get_styles(self, speaker, denoise=0.3, avg_style=True):
+        if avg_style:   split_dur = 3
         else:           split_dur = 0
-        styles = {}
-        for id in speakers:
-            ref_s = self.__compute_style(speakers[id]['path'], denoise=denoise, split_dur=split_dur)
-            styles[id] = {
-                'style': ref_s,
-                'path': speakers[id]['path'],
-                'lang': speakers[id]['lang'],
-                'speed': speakers[id]['speed'],
-            }
-        return styles
+        style = {}
+        ref_s = self.__compute_style(speaker['path'], denoise=denoise, split_dur=split_dur)
+        style = {
+            'style': ref_s,
+            'path': speaker['path'],
+            'speed': speaker['speed'],
+        }
+        return style
 
-    def generate(self, text, styles, stabilize=True, n_merge=16, default_speaker= "[id_1]"):
+    def generate(self, phonem, style, stabilize=True, n_merge=16):
         if stabilize:   smooth_value=0.2
         else:           smooth_value=0    
         
         list_wav        = []
         prev_d_mean     = 0
-        lang_pattern    = r'\[([^\]]+)\]\{([^}]+)\}'
-
-        text = re.sub(r'[\n\r\t\f\v]', '', text)
-        #fix lang tokens span to multiple sents
-        find_lang_tokens = re.findall(lang_pattern, text)
-        if find_lang_tokens:
-            cus_text = []
-            for lang, t in find_lang_tokens:
-                parts = self.preprocess.text_preprocess(t, n_merge=0)
-                parts = ".".join([f"[{lang}]" + f"{{{p}}}"for p in parts])
-                cus_text.append(parts)
-            replacement_func = self.__init_replacement_func(cus_text)
-            text = re.sub(lang_pattern, replacement_func, text)
-
-        texts = re.split(r'(\[id_\d+\])', text) #split the text by speaker ids while keeping the ids.
-        if len(texts) <= 1 or bool(re.match(r'(\[id_\d+\])', texts[0])) == False: #Add a default speaker
-            texts.insert(0, default_speaker)
-        curr_id = None
-        for i in range(len(texts)): #remove consecutive ids
-            if bool(re.match(r'(\[id_\d+\])', texts[i])):
-                if texts[i]!=curr_id:
-                    curr_id = texts[i]
-                else:
-                    texts[i] = ''
-        del curr_id
-        texts = list(filter(lambda x: x != '', texts))
 
         print("Generating Audio...")
-        for i in texts:
-            if bool(re.match(r'(\[id_\d+\])', i)):
-                #Set up env for matched speaker
-                speaker_id = i.strip('[]')
-                current_ref_s = styles[speaker_id]['style']
-                speed = styles[speaker_id]['speed']
-                continue
-            text_norm = self.preprocess.text_preprocess(i, n_merge=n_merge)
-            for sentence in text_norm:
-                cus_phonem = []
-                find_lang_tokens = re.findall(lang_pattern, sentence)
-                if find_lang_tokens:
-                    for lang, t in find_lang_tokens:
-                        try:
-                            phonem = espeak_phn(t, lang)
-                            cus_phonem.append(phonem)
-                        except Exception as e:
-                            print(e)
-                        
-                replacement_func = self.__init_replacement_func(cus_phonem)
-                phonem =  espeak_phn(sentence, styles[speaker_id]['lang'])
-                phonem = re.sub(lang_pattern, replacement_func, phonem)
-
-                wav, prev_d_mean = self.__inference(phonem, current_ref_s, speed=speed, prev_d_mean=prev_d_mean, t=smooth_value)
-                wav = wav[4000:-4000] #Remove weird pulse and silent tokens
-                list_wav.append(wav)
+        text_norm = self.preprocess.text_preprocess(phonem, n_merge=n_merge)
+        for sentence in text_norm:
+            wav, prev_d_mean = self.__inference(sentence, style['style'], speed=style['speed'], prev_d_mean=prev_d_mean, t=smooth_value)
+            wav = wav[4000:-4000] #Remove weird pulse and silent tokens
+            list_wav.append(wav)
         
         final_wav = np.concatenate(list_wav)
         final_wav = np.concatenate([np.zeros([4000]), final_wav, np.zeros([4000])], axis=0) # add padding
