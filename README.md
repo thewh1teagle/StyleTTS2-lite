@@ -1,18 +1,17 @@
 # StyleTTS2-lite
 
 ## Base Model
-
-_Checkpoints:_
-
 _If you have a better checkpoint, your contribution would be greatly appreciated!_
 
-- **English checkpoint (LibriTTS 100,000 steps):** [Download (MIT)](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main/Models)  
-- **Vietnamese checkpoint (viVoice 120,000 steps):** [Download (CC BY 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
+**English**:
+- English checkpoint (LibriTTS 100,000 steps): [Download (MIT)](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main/Models)  
+- LibriTTS dataset (CC BY 4.0): [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main) 
+- Demo: [StyleTTS2-lite-space](https://huggingface.co/spaces/dangtr0408/StyleTTS2-lite-space)
 
-_Datasets:_
-
-- **LibriTTS dataset (CC BY 4.0):** [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main) 
-- **viVoice dataset (CC BY 4.0 SA):** [Download](https://huggingface.co/datasets/capleaf/viVoice) 
+**Vietnamese**:
+- Vietnamese checkpoint (viVoice 120,000 steps): [Download (CC BY 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
+- viVoice dataset (CC BY 4.0 SA): [Download](https://huggingface.co/datasets/capleaf/viVoice) 
+- Demo: [StyleTTS2-lite-vi-space](https://huggingface.co/spaces/dangtr0408/StyleTTS2-lite-vi-space)
 
 Model Component Parameter Summary
 
