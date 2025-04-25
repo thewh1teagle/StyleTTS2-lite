@@ -2,10 +2,10 @@
 import gradio as gr
 import os
 import sys
-import soundfile as sf
 import torch
 import traceback
 import random
+import numpy as np
 device = 'cuda' if torch.cuda.is_available() else 'cpu' #setup GPU
 
 #import espeak
@@ -28,12 +28,12 @@ def get_phoneme(text, lang):
         print(e)
 
 #import inference
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from inference import StyleTTS2
 
 #########################################CHANGE YOUR PATH HERE#########################################
-config_path = os.path.join("Configs", "config.yaml")
-models_path = os.path.join("Models", "model.pth")
+config_path = os.path.abspath(os.path.join("Configs", "config.yaml"))
+models_path = os.path.abspath(os.path.join("Models", "model.pth"))
 #######################################################################################################
 voice_path = os.path.join("Demo", "Audio")
 model = StyleTTS2(config_path, models_path).eval().to(device)
@@ -97,8 +97,8 @@ def main(text_prompt, reference_paths, speed, denoise, avg_style, stabilize):
             styles  = model.get_styles(speaker, denoise, avg_style)
             r       = model.generate(phonemes, styles, stabilize, 18)
             
-        sf.write("output_demo.wav", r, samplerate=24000)
-        return "output_demo.wav", "Audio generated successfully!"
+        r = r / np.max(np.abs(r)) #Normalize
+        return (24000, r), "Audio generated successfully!"
     
     except Exception as e:
         error_message = traceback.format_exc()
@@ -126,9 +126,9 @@ with gr.Blocks() as demo:
     with gr.Row(equal_height=True):
         with gr.Column():
             speed = gr.Slider(0.0, 2.0, step=0.1, value=1.0, label="Speed")
-            denoise = gr.Slider(0.0, 1.0, step=0.1, value=0.0, label="Denoise Strength")
-            avg_style = gr.Checkbox(label="Use Average Styles", value=False)
-            stabilize = gr.Checkbox(label="Stabilize Speaking Speed", value=False)
+            denoise = gr.Slider(0.0, 1.0, step=0.1, value=0.2, label="Denoise Strength")
+            avg_style = gr.Checkbox(label="Use Average Styles", value=True)
+            stabilize = gr.Checkbox(label="Stabilize Speaking Speed", value=True)
 
             text_prompt = gr.Textbox(label="Text Prompt", placeholder="Enter your text here...", lines=10, max_lines=10)
 
@@ -137,13 +137,15 @@ with gr.Blocks() as demo:
 
         with gr.Column():
             reference_audios = gr.Audio(label="Reference Audios", type='filepath')
-            synthesized_audio = gr.Audio(label="Generate Audio", type="filepath")
+            synthesized_audio = gr.Audio(label="Generate Audio", type='numpy')
             
             example_voices = gr.Dropdown(
                 label="Example voices",
                 choices=voice_choices,
-                value=voice_choices[0][0],
+                value=None,
                 interactive=True,
+                allow_custom_value=False,
+                filterable=False
             )
 
             with gr.Row(equal_height=False):
