@@ -2,12 +2,17 @@
 
 ## Base Model
 
-The base model is initialized from StyleTTS2 (LibriTTS) and then fine‑tuned after removing some components. This checkpoint has only been trained on LibriTTS for ~30k steps, it still needs more training.
+_Checkpoints:_
 
-- **Download the current checkpoint:** [Download](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main)  
-  _If you have a better checkpoint, your contribution would be greatly appreciated!_
+_If you have a better checkpoint, your contribution would be greatly appreciated!_
 
-- **LibriTTS dataset (for fine‑tuning base model):** [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main)
+- **English checkpoint (LibriTTS 100,000 steps):** [Download (MIT)](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main/Models)  
+- **Vietnamese checkpoint (viVoice 120,000 steps):** [Download (CC BY 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
+
+_Datasets:_
+
+- **LibriTTS dataset (CC BY 4.0):** [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main) 
+- **viVoice dataset (CC BY 4.0 SA):** [Download](https://huggingface.co/datasets/capleaf/viVoice) 
 
 Model Component Parameter Summary
 
@@ -74,7 +79,7 @@ python train.py
 
 ## Disclaimer  
 
-***Before using these pre-trained models, you agree to inform the listeners that the speech samples are synthesized by the pre-trained models, unless you have the permission to use the voice you synthesize. That is, you agree to only use voices whose speakers grant the permission to have their voice cloned, either directly or by license before making synthesized voices public, or you have to publicly announce that these voices are synthesized if you do not have the permission to use these voices.***
+**Before using these pre-trained models, you agree to inform the listeners that the speech samples are synthesized by the pre-trained models, unless you have the permission to use the voice you synthesize. That is, you agree to only use voices whose speakers grant the permission to have their voice cloned, either directly or by license before making synthesized voices public, or you have to publicly announce that these voices are synthesized if you do not have the permission to use these voices.**
 
 
 ## References
