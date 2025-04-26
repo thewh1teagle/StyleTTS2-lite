@@ -5,12 +5,12 @@ _If you have a better checkpoint, your contribution would be greatly appreciated
 
 **English**:
 - English checkpoint (LibriTTS 100,000 steps): [Download (MIT)](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main/Models)  
-- LibriTTS dataset (CC BY 4.0): [Download](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main) 
+- LibriTTS dataset: [Download (CC BY 4.0)](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main) 
 - Demo: [StyleTTS2-lite-space](https://huggingface.co/spaces/dangtr0408/StyleTTS2-lite-space)
 
 **Vietnamese**:
-- Vietnamese checkpoint (viVoice 120,000 steps): [Download (CC BY 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
-- viVoice dataset (CC BY 4.0 SA): [Download](https://huggingface.co/datasets/capleaf/viVoice) 
+- Vietnamese checkpoint (viVoice 120,000 steps): [Download (CC BY NC 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
+- viVoice dataset: [Download (CC BY NC 4.0 SA)](https://huggingface.co/datasets/capleaf/viVoice) 
 - Demo: [StyleTTS2-lite-vi-space](https://huggingface.co/spaces/dangtr0408/StyleTTS2-lite-vi-space)
 - Extended vocabulary: 189 tokens (see [inference.py L38–42](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/blob/main/inference.py#L38-L42)). To continue training, add these tokens to [***meldataset.py***](https://github.com/dangtr0408/StyleTTS2-lite/blob/e39072d03f3a406790809fe80f83df5aaf5342b7/meldataset.py#L23-L38).
 
@@ -38,8 +38,7 @@ pip  install  -r  requirements.txt
 
 **2. Download model and config file**
 
-[Download](https://huggingface.co/dangtr0408/StyleTTS2-lite/tree/main)
-and place the base model in ***/Models/Finetune*** and the corresponding config file in ***/Configs***.
+Download and place the base model in ***/Models/Finetune*** and the corresponding config file in ***/Configs***.
 
 **3. Format your data like StyleTTS2, but exclude the speaker field.**
 
