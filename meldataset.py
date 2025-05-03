@@ -1,7 +1,5 @@
 #coding: utf-8
-import os
 import os.path as osp
-import time
 import random
 import numpy as np
 import random
@@ -9,10 +7,10 @@ import soundfile as sf
 import librosa
 
 import torch
-from torch import nn
-import torch.nn.functional as F
 import torchaudio
-from torch.utils.data import DataLoader
+import torch.utils.data
+import torch.distributed as dist
+from multiprocessing import Pool
 
 import logging
 logger = logging.getLogger(__name__)
@@ -79,9 +77,6 @@ class FilePathDataset(torch.utils.data.Dataset):
                  data_augmentation=False,
                  validation=False
                  ):
-
-        spect_params = SPECT_PARAMS
-        mel_params = MEL_PARAMS
 
         _data_list = [l.strip().split('|') for l in data_list]
         self.data_list = _data_list #[data if len(data) == 3 else (*data, 0) for data in _data_list] #append speakerid=0 for all
@@ -195,6 +190,9 @@ class Collater(object):
         return waves, texts, input_lengths, mels, output_lengths
 
 
+def get_length(wave_path, root_path):
+    info = sf.info(osp.join(root_path, wave_path))
+    return info.frames * (24000 / info.samplerate)
 
 def build_dataloader(path_list,
                      root_path,
@@ -207,12 +205,108 @@ def build_dataloader(path_list,
     
     dataset = FilePathDataset(path_list, root_path, validation=validation, **dataset_config)
     collate_fn = Collater(**collate_config)
-    data_loader = DataLoader(dataset,
-                             batch_size=batch_size,
-                             shuffle=(not validation),
-                             num_workers=num_workers,
-                             drop_last=(not validation),
-                             collate_fn=collate_fn,
-                             pin_memory=(device != 'cpu'))
+    
+    print("Getting sample lengths...")
+    list_of_tuples = [(d[0], root_path) for d in dataset.data_list]
+    num_processes = max(num_workers * 2, 2)
+    with Pool(processes=num_processes) as pool:
+        sample_lengths = pool.starmap(get_length, list_of_tuples, chunksize=16)
+
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        num_workers=num_workers,
+        batch_sampler=BatchSampler(
+            sample_lengths,
+            batch_size,
+            shuffle=(not validation),
+            drop_last=(not validation),
+            num_replicas=1,
+            rank=0,
+        ),
+        collate_fn=collate_fn,
+        pin_memory=(device != "cpu"),
+    )
 
     return data_loader
+
+#https://github.com/duerig/StyleTTS2/
+class BatchSampler(torch.utils.data.Sampler):
+    def __init__(
+        self,
+        sample_lengths,
+        batch_sizes,
+        num_replicas=None,
+        rank=None,
+        shuffle=True,
+        drop_last=False,
+    ):
+        self.batch_sizes = batch_sizes
+        if num_replicas is None:
+            self.num_replicas = dist.get_world_size()
+        else:
+            self.num_replicas = num_replicas
+        if rank is None:
+            self.rank = dist.get_rank()
+        else:
+            self.rank = rank
+        self.shuffle = shuffle
+        self.drop_last = drop_last
+
+        self.time_bins = {}
+        self.epoch = 0
+        self.total_len = 0
+        self.last_bin = None
+
+        for i in range(len(sample_lengths)):
+            bin_num = self.get_time_bin(sample_lengths[i])
+            if bin_num != -1:
+                if bin_num not in self.time_bins:
+                    self.time_bins[bin_num] = []
+                self.time_bins[bin_num].append(i)
+
+        for key in self.time_bins.keys():
+            val = self.time_bins[key]
+            total_batch = self.batch_sizes * num_replicas
+            self.total_len += len(val) // total_batch
+            if not self.drop_last and len(val) % total_batch != 0:
+                self.total_len += 1
+
+    def __iter__(self):
+        sampler_order = list(self.time_bins.keys())
+        sampler_indices = []
+
+        if self.shuffle:
+            sampler_indices = torch.randperm(len(sampler_order)).tolist()
+        else:
+            sampler_indices = list(range(len(sampler_order)))
+
+        for index in sampler_indices:
+            key = sampler_order[index]
+            current_bin = self.time_bins[key]
+            dist = torch.utils.data.distributed.DistributedSampler(
+                current_bin,
+                num_replicas=self.num_replicas,
+                rank=self.rank,
+                shuffle=self.shuffle,
+                drop_last=self.drop_last,
+            )
+            dist.set_epoch(self.epoch)
+            sampler = torch.utils.data.sampler.BatchSampler(
+                dist, self.batch_sizes, self.drop_last
+            )
+            for item_list in sampler:
+                self.last_bin = key
+                yield [current_bin[i] for i in item_list]
+
+    def __len__(self):
+        return self.total_len
+
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def get_time_bin(self, sample_count):
+        result = -1
+        frames = sample_count // 300
+        if frames >= 20:
+            result = (frames - 20) // 20
+        return result

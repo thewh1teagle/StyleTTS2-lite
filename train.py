@@ -73,6 +73,7 @@ def main(config_path):
     train_list, val_list = get_data_path_list(train_path, val_path)
     device = 'cuda'
 
+    print("Initializing train_dataloader...")
     train_dataloader = build_dataloader(train_list,
                                         root_path,
                                         batch_size=batch_size,
@@ -80,6 +81,7 @@ def main(config_path):
                                         dataset_config={},
                                         device=device)
 
+    print("Initializing val_dataloader...")
     val_dataloader = build_dataloader(val_list,
                                       root_path,
                                       batch_size=batch_size,
@@ -166,9 +168,7 @@ def main(config_path):
             texts, input_lengths, mels, mel_input_length = batch
             with torch.no_grad():
                 mask = length_to_mask(mel_input_length // (2 ** n_down)).to(device)
-                mel_mask = length_to_mask(mel_input_length).to(device)
                 text_mask = length_to_mask(input_lengths).to(texts.device)
-                
             try:
                 ppgs, s2s_pred, s2s_attn = model.text_aligner(mels, mask, texts)
                 s2s_attn = s2s_attn.transpose(-1, -2)
@@ -192,14 +192,7 @@ def main(config_path):
             d_gt = s2s_attn_mono.sum(axis=-1).detach()
 
             # compute the style of the entire utterance
-            # this operation cannot be done in batch because of the avgpool layer (may need to work on masked avgpool)
-            ss = []
-            for bib in range(len(mel_input_length)):
-                mel_length = int(mel_input_length[bib].item())
-                mel = mels[bib, :, :mel_input_length[bib]]
-                s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
-                ss.append(s)
-            s = torch.stack(ss).squeeze()  # global prosodic styles
+            s = model.style_encoder(mels.unsqueeze(1))
 
             d, p = model.predictor(t_en, s, 
                                     input_lengths, 
@@ -369,13 +362,8 @@ def main(config_path):
 
                         d_gt = s2s_attn_mono.sum(axis=-1).detach()
 
-                    ss = []
-                    for bib in range(len(mel_input_length)):
-                        mel_length = int(mel_input_length[bib].item())
-                        mel = mels[bib, :, :mel_input_length[bib]]
-                        s = model.style_encoder(mel.unsqueeze(0).unsqueeze(1))
-                        ss.append(s)
-                    s = torch.stack(ss).squeeze()  # global prosodic styles
+                    # compute the style of the entire utterance
+                    s = model.style_encoder(mels.unsqueeze(1))
 
                     d, p = model.predictor(t_en, s, 
                                             input_lengths, 
