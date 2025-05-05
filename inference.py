@@ -65,6 +65,7 @@ class StyleTTS2(torch.nn.Module):
         super().__init__()
         self.register_buffer("get_device", torch.empty(0))
         self.preprocess = Preprocess()
+        self.ref_s = None
 
         config = yaml.safe_load(open(config_path))
         args = self.__recursive_munch(config['model_params'])
@@ -231,17 +232,35 @@ class StyleTTS2(torch.nn.Module):
         
         return out.squeeze().cpu().numpy(), duration.mean()
     
-    def get_styles(self, speaker, denoise=0.3, avg_style=True):
-        if avg_style:   split_dur = 3
-        else:           split_dur = 0
+    def get_styles(self, speaker, denoise=0.3, avg_style=True, load_styles=False):
         style = {}
-        ref_s = self.__compute_style(speaker['path'], denoise=denoise, split_dur=split_dur)
+        if not load_styles:
+            if avg_style:   split_dur = 3
+            else:           split_dur = 0
+            self.ref_s = self.__compute_style(speaker['path'], denoise=denoise, split_dur=split_dur)
+        else:
+            if self.ref_s is None:
+                raise Exception("Have to compute or load the styles first!")
         style = {
-            'style': ref_s,
+            'style': self.ref_s,
             'path': speaker['path'],
             'speed': speaker['speed'],
         }
         return style
+    
+    def save_styles(self, save_dir):
+        if self.ref_s is not None:
+            torch.save(self.ref_s, save_dir)
+            print("Saved styles!")
+        else:
+            raise Exception("Have to compute the styles before saving it.")
+
+    def load_styles(self, save_dir):
+        try:
+            self.ref_s = torch.load(save_dir)
+            print("Loaded styles!")
+        except Exception as e:
+            print(e)
 
     def generate(self, phonem, style, stabilize=True, n_merge=16):
         if stabilize:   smooth_value=0.2
