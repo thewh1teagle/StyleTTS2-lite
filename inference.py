@@ -12,7 +12,6 @@ import nltk
 nltk.download('punkt_tab')
 
 from models import ProsodyPredictor, TextEncoder, StyleEncoder
-from Modules.hifigan import Decoder
 
 class Preprocess:
     def __text_normalize(self, text):
@@ -70,14 +69,25 @@ class StyleTTS2(torch.nn.Module):
         config = yaml.safe_load(open(config_path))
         args = self.__recursive_munch(config['model_params'])
 
-        assert args.decoder.type in ['hifigan'], 'Decoder type unknown'
+        assert args.decoder.type in ['istftnet', 'hifigan'], 'Decoder type unknown'
 
-        self.decoder            = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
-                                        resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
-                                        upsample_rates = args.decoder.upsample_rates,
-                                        upsample_initial_channel=args.decoder.upsample_initial_channel,
-                                        resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
-                                        upsample_kernel_sizes=args.decoder.upsample_kernel_sizes)
+        if args.decoder.type == "istftnet":
+            from Modules.istftnet import Decoder
+            self.decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
+                    resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
+                    upsample_rates = args.decoder.upsample_rates,
+                    upsample_initial_channel=args.decoder.upsample_initial_channel,
+                    resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
+                    upsample_kernel_sizes=args.decoder.upsample_kernel_sizes, 
+                    gen_istft_n_fft=args.decoder.gen_istft_n_fft, gen_istft_hop_size=args.decoder.gen_istft_hop_size) 
+        else:
+            from Modules.hifigan import Decoder
+            self.decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
+                    resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
+                    upsample_rates = args.decoder.upsample_rates,
+                    upsample_initial_channel=args.decoder.upsample_initial_channel,
+                    resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
+                    upsample_kernel_sizes=args.decoder.upsample_kernel_sizes) 
         self.predictor           = ProsodyPredictor(style_dim=args.style_dim, d_hid=args.hidden_dim, nlayers=args.n_layer, max_dur=args.max_dur, dropout=args.dropout)
         self.text_encoder        = TextEncoder(channels=args.hidden_dim, kernel_size=5, depth=args.n_layer, n_symbols=args.n_token)
         self.style_encoder       = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim)# acoustic style encoder
