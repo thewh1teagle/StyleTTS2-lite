@@ -37,7 +37,7 @@ voice_path = str(Path("Demo") / "Audio")
 model = StyleTTS2(config_path, models_path).eval().to(device)
 
 def main():
-    phonemes = 'həloʊ wɜːld'
+    phonemes = 'həloʊ wɜːld! haʊ ɑːɹ juː ɛvɹɪwʌn?'
     speed = 1.0
     denoise = 0.2
     avg_style = True
@@ -45,7 +45,7 @@ def main():
     reference_paths = ''  # Update this with the actual path
 
     speaker = {
-        "path": './Demo/Audio/1_heart.wav',
+        "path": 'Demo/Audio/13_echo.wav',
         "speed": speed
     }
 
