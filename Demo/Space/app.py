@@ -33,7 +33,7 @@ from inference import StyleTTS2
 
 #########################################CHANGE YOUR PATH HERE#########################################
 config_path = os.path.abspath(os.path.join("Configs", "config.yaml"))
-models_path = os.path.abspath(os.path.join("Models", "model.pth"))
+models_path = os.path.abspath(os.path.join("Models/Finetune", "base_model.pth"))
 #######################################################################################################
 voice_path = os.path.join("Demo", "Audio")
 model = StyleTTS2(config_path, models_path).eval().to(device)
