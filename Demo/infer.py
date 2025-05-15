@@ -12,18 +12,6 @@ import numpy as np
 from pathlib import Path
 device = 'cuda' if torch.cuda.is_available() else 'cpu' #setup GPU
 
-#import espeak
-#If you did not use eSpeak for your language, please add your own G2P.
-import sys
-import phonemizer
-if sys.platform.startswith("win"):
-    try:
-        from phonemizer.backend.espeak.wrapper import EspeakWrapper
-        import espeakng_loader
-        EspeakWrapper.set_library(espeakng_loader.get_library_path())
-    except Exception as e:
-        print(e)
-
 #import inference
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
