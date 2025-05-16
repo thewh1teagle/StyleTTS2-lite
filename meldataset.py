@@ -207,10 +207,16 @@ def build_dataloader(path_list,
     collate_fn = Collater(**collate_config)
     
     print("Getting sample lengths...")
-    list_of_tuples = [(d[0], root_path) for d in dataset.data_list]
-    num_processes = max(num_workers * 2, 2)
-    with Pool(processes=num_processes) as pool:
-        sample_lengths = pool.starmap(get_length, list_of_tuples, chunksize=16)
+    
+    num_processes = num_workers * 2
+    if num_processes != 0:
+        list_of_tuples = [(d[0], root_path) for d in dataset.data_list]
+        with Pool(processes=num_processes) as pool:
+            sample_lengths = pool.starmap(get_length, list_of_tuples, chunksize=16)
+    else:
+        sample_lengths = []
+        for d in dataset.data_list:
+            sample_lengths.append(get_length(d[0], root_path))
 
     data_loader = torch.utils.data.DataLoader(
         dataset,
