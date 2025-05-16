@@ -533,7 +533,7 @@ class DurationEncoder(nn.Module):
         return mask
 
 def build_model(args):
-    assert args.decoder.type in ['istftnet', 'hifigan'], 'Decoder type unknown'
+    assert args.decoder.type in ['istftnet', 'hifigan', 'vocos'], 'Decoder type unknown'
     
     if args.decoder.type == "istftnet":
         from Modules.istftnet import Decoder
@@ -544,7 +544,7 @@ def build_model(args):
                 resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
                 upsample_kernel_sizes=args.decoder.upsample_kernel_sizes, 
                 gen_istft_n_fft=args.decoder.gen_istft_n_fft, gen_istft_hop_size=args.decoder.gen_istft_hop_size) 
-    else:
+    elif args.decoder.type == "hifigan":
         from Modules.hifigan import Decoder
         decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
                 resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
@@ -552,6 +552,13 @@ def build_model(args):
                 upsample_initial_channel=args.decoder.upsample_initial_channel,
                 resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
                 upsample_kernel_sizes=args.decoder.upsample_kernel_sizes) 
+    elif args.decoder.type == "vocos":
+        from Modules.vocos import Decoder
+        decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
+                intermediate_dim=args.decoder.intermediate_dim,
+                num_layers=args.decoder.num_layers,
+                gen_istft_n_fft=args.decoder.gen_istft_n_fft,
+                gen_istft_hop_size=args.decoder.gen_istft_hop_size)
         
     nets = Munch(
             decoder = decoder,
@@ -568,7 +575,8 @@ def build_model(args):
     
     return nets
 
-def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_modules=[]):
+def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_modules=[], freeze_modules=[]):
+    print("\n")
     state = torch.load(path, map_location='cpu')
     params = state['net']
 
@@ -579,7 +587,6 @@ def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_module
         model_has_module = model_keys[0].startswith('module.')
 
         if key in params and key not in ignore_modules:
-            print('%s loaded' % key)
             try:
                 model[key].load_state_dict(params[key], strict=True)
             except Exception as e:
@@ -603,13 +610,23 @@ def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_module
                     model[key].load_state_dict(new_state_dict, strict=True)# load params
                 else:
                     print(e)
+            print('%s LOADED' % key)
+        if key in freeze_modules:
+            for param in model[key].parameters():
+                param.requires_grad = False
+            print('%s FREEZED\n' % key)
+        if key in ignore_modules:
+            print('%s IGNORED\n' % key)
     _ = [model[key].eval() for key in model]
+    
 
     if not load_only_params:
+        print('LOADING OLD OPTIMIZER')
         epoch = state["epoch"]
         iters = state["iters"]
         optimizer.load_state_dict(state["optimizer"])
     else:
+        print('NOT LOADING OLD OPTIMIZER')
         epoch = 0
         iters = 0
 
