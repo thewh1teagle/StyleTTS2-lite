@@ -136,7 +136,13 @@ def main(config_path):
         
     # load models if there is a model
     if load_pretrained:
-        training_strats = config['training_strats']
+        try:
+            training_strats = config['training_strats']
+        except Exception as e:
+            print(e)
+            training_strats = {}
+            training_strats['ignore_modules'] = ''
+            training_strats['freeze_modules'] = ''
         model, optimizer, start_epoch, iters = load_checkpoint(model,  optimizer, 
                                                                config['pretrained_model'], 
                                                                load_only_params=config.get('load_only_params', True),
