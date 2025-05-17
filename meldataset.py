@@ -18,33 +18,19 @@ logger.setLevel(logging.DEBUG)
 
 import pandas as pd
 
-##########################################################
-_pad = "$"
-_punctuation = ';:,.!?¡¿—…"«»“” '
-_letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-_letters_ipa = "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
-_extend = "" #ADD MORE SYMBOLS HERE
-
-# Export all symbols:
-symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa) + list(_extend)
-
-dicts = {}
-for i in range(len((symbols))):
-    dicts[symbols[i]] = i
-
-# Copy this code somewhere else then run with print(len(dicts) + 1) to check total symbols
-##########################################################
-
 class TextCleaner:
-    def __init__(self, dummy=None):
-        self.word_index_dictionary = dicts
+    def __init__(self, symbol_dict, debug=True):
+        self.word_index_dictionary = symbol_dict
+        self.debug = debug
     def __call__(self, text):
         indexes = []
         for char in text:
             try:
                 indexes.append(self.word_index_dictionary[char])
             except KeyError as e:
-                #print(char)
+                if self.debug:
+                    print("\nWARNING UNKNOWN IPA CHARACTERS/LETTERS: ", char)
+                    print("To ignore set 'debug' to false in the config")
                 continue
         return indexes
 
@@ -73,14 +59,16 @@ class FilePathDataset(torch.utils.data.Dataset):
     def __init__(self,
                  data_list,
                  root_path,
+                 symbol_dict,
                  sr=24000,
                  data_augmentation=False,
-                 validation=False
+                 validation=False,
+                 debug=True
                  ):
 
         _data_list = [l.strip().split('|') for l in data_list]
         self.data_list = _data_list #[data if len(data) == 3 else (*data, 0) for data in _data_list] #append speakerid=0 for all
-        self.text_cleaner = TextCleaner()
+        self.text_cleaner = TextCleaner(symbol_dict, debug)
         self.sr = sr
 
         self.df = pd.DataFrame(self.data_list)
@@ -196,6 +184,7 @@ def get_length(wave_path, root_path):
 
 def build_dataloader(path_list,
                      root_path,
+                     symbol_dict,
                      validation=False,
                      batch_size=4,
                      num_workers=1,
@@ -203,7 +192,7 @@ def build_dataloader(path_list,
                      collate_config={},
                      dataset_config={}):
     
-    dataset = FilePathDataset(path_list, root_path, validation=validation, **dataset_config)
+    dataset = FilePathDataset(path_list, root_path, symbol_dict, validation=validation, **dataset_config)
     collate_fn = Collater(**collate_config)
     
     print("Getting sample lengths...")

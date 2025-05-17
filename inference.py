@@ -65,9 +65,30 @@ class StyleTTS2(torch.nn.Module):
         self.register_buffer("get_device", torch.empty(0))
         self.preprocess = Preprocess()
         self.ref_s = None
-
-        config = yaml.safe_load(open(config_path))
+        config = yaml.safe_load(open(config_path, "r", encoding="utf-8"))
+        
+        try:
+            symbols = (
+                            list(config['symbol']['pad']) +
+                            list(config['symbol']['punctuation']) +
+                            list(config['symbol']['letters']) +
+                            list(config['symbol']['letters_ipa']) +
+                            list(config['symbol']['extend'])
+                        )
+            symbol_dict = {}
+            for i in range(len((symbols))):
+                symbol_dict[symbols[i]] = i
+            
+            n_token = len(symbol_dict) + 1
+            print("\nFound:", n_token, "symbols")
+        except Exception as e:
+            print(f"\nERROR: Cannot find {e} in config file!\nYour config file is likely outdated, please download updated version from the repository.")
+            raise SystemExit(1)
+        
         args = self.__recursive_munch(config['model_params'])
+        args['n_token'] = n_token
+        
+        self.cleaner = TextCleaner(symbol_dict, debug=False)
 
         assert args.decoder.type in ['istftnet', 'hifigan', 'vocos'], 'Decoder type unknown'
     
@@ -205,7 +226,7 @@ class StyleTTS2(torch.nn.Module):
         speed = min(max(speed, 0.0001), 2) #speed range [0, 2]
         
         phonem = ' '.join(word_tokenize(phonem))
-        tokens = TextCleaner()(phonem)
+        tokens = self.cleaner(phonem)
         tokens.insert(0, 0)
         tokens.append(0)
         tokens = torch.LongTensor(tokens).to(device).unsqueeze(0)
@@ -251,7 +272,6 @@ class StyleTTS2(torch.nn.Module):
         return out.squeeze().cpu().numpy(), duration.mean()
     
     def get_styles(self, speaker, denoise=0.3, avg_style=True, load_styles=False):
-        style = {}
         if not load_styles:
             if avg_style:   split_dur = 3
             else:           split_dur = 0

@@ -40,7 +40,7 @@ logger.addHandler(handler)
 @click.command()
 @click.option('-p', '--config_path', default='Configs/config.yaml', type=str)
 def main(config_path):
-    config = yaml.safe_load(open(config_path))
+    config = yaml.safe_load(open(config_path, "r", encoding="utf-8"))
     
     log_dir = config['log_dir']
     if not os.path.exists(log_dir): os.makedirs(log_dir, exist_ok=True)
@@ -53,9 +53,8 @@ def main(config_path):
     file_handler.setFormatter(logging.Formatter('%(levelname)s:%(asctime)s: %(message)s'))
     logger.addHandler(file_handler)
 
-    
     batch_size = config.get('batch_size', 10)
-
+    debug = config.get('debug', True)
     epochs = config.get('epochs', 200)
     save_freq = config.get('save_freq', 2)
     log_interval = config.get('log_interval', 10)
@@ -63,41 +62,61 @@ def main(config_path):
     train_path = data_params['train_data']
     val_path = data_params['val_data']
     root_path = data_params['root_path']
-
     max_len = config.get('max_len', 200)
+
+    try:
+        symbols = (
+                        list(config['symbol']['pad']) +
+                        list(config['symbol']['punctuation']) +
+                        list(config['symbol']['letters']) +
+                        list(config['symbol']['letters_ipa']) +
+                        list(config['symbol']['extend'])
+                    )
+        symbol_dict = {}
+        for i in range(len((symbols))):
+            symbol_dict[symbols[i]] = i
+
+        n_token = len(symbol_dict) + 1
+        print("\nFound:", n_token, "symbols")
+    except Exception as e:
+        print(f"\nERROR: Cannot find {e} in config file!\nYour config file is likely outdated, please download updated version from the repository.")
+        raise SystemExit(1)
     
     loss_params = Munch(config['loss_params'])
-    
     optimizer_params = Munch(config['optimizer_params'])
     
     train_list, val_list = get_data_path_list(train_path, val_path)
     device = 'cuda'
 
-    print("Initializing train_dataloader...")
+    print("\n")
+    print("Initializing train_dataloader")
     train_dataloader = build_dataloader(train_list,
                                         root_path,
+                                        symbol_dict,
                                         batch_size=batch_size,
-                                        num_workers=2,
-                                        dataset_config={},
+                                        num_workers=3,
+                                        dataset_config={"debug": debug},
                                         device=device)
 
-    print("Initializing val_dataloader...")
+    print("Initializing val_dataloader")
     val_dataloader = build_dataloader(val_list,
                                       root_path,
+                                      symbol_dict,
                                       batch_size=batch_size,
                                       validation=True,
-                                      num_workers=0,
-                                      device=device,
-                                      dataset_config={})
+                                      num_workers=1,
+                                      dataset_config={"debug": debug},
+                                      device=device)
     
     # build model
     model_params = recursive_munch(config['model_params'])
+    model_params['n_token'] = n_token
     model = build_model(model_params)
     _ = [model[key].to(device) for key in model]
 
     # DP
     for key in model:
-        if key != "mpd" and key != "msd" and key != "wd":
+        if key != "mpd" and key != "msd":
             model[key] = MyDataParallel(model[key])
 
     start_epoch = 0
@@ -139,7 +158,7 @@ def main(config_path):
         try:
             training_strats = config['training_strats']
         except Exception as e:
-            print(e)
+            print("\nNo training_strats found in config. Proceeding with default settings...")
             training_strats = {}
             training_strats['ignore_modules'] = ''
             training_strats['freeze_modules'] = ''
@@ -160,8 +179,10 @@ def main(config_path):
     
     stft_loss = MultiResolutionSTFTLoss().to(device)
     
-    print('decoder', optimizer.optimizers['decoder'])
+    print('\ndecoder', optimizer.optimizers['decoder'])
     
+############################################## TRAIN ##############################################
+
     for epoch in range(start_epoch, epochs):
         running_loss = 0
         start_time = time.time()
@@ -339,7 +360,7 @@ def main(config_path):
 ############################################## EVAL ##############################################
 
 
-        print("Evaluating...")
+        print("\nEvaluating...")
         loss_test = 0
         loss_align = 0
         loss_f = 0

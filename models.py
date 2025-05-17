@@ -265,7 +265,7 @@ class TextEncoder(nn.Module):
             
         x = x.transpose(1, 2)  # [B, T, chn]
 
-        input_lengths = input_lengths.cpu().numpy()
+        input_lengths = input_lengths.cpu()
         x = nn.utils.rnn.pack_padded_sequence(
             x, input_lengths, batch_first=True, enforce_sorted=False)
 
@@ -423,7 +423,7 @@ class ProsodyPredictor(nn.Module):
         d = self.text_encoder(texts, style, text_lengths, m)
         
         # predict duration
-        input_lengths = text_lengths.cpu().numpy()
+        input_lengths = text_lengths.cpu()
         x = nn.utils.rnn.pack_padded_sequence(
             d, input_lengths, batch_first=True, enforce_sorted=False)
         
@@ -493,7 +493,7 @@ class DurationEncoder(nn.Module):
         x.masked_fill_(masks.unsqueeze(-1).transpose(0, 1), 0.0)
                 
         x = x.transpose(0, 1)
-        input_lengths = text_lengths.cpu().numpy()
+        input_lengths = text_lengths.cpu()
         x = x.transpose(-1, -2)
         
         for block in self.lstms:
@@ -565,7 +565,7 @@ def build_model(args):
             predictor    = ProsodyPredictor(style_dim=args.style_dim, d_hid=args.hidden_dim, nlayers=args.n_layer, max_dur=args.max_dur, dropout=args.dropout),
             text_encoder = TextEncoder(channels=args.hidden_dim, kernel_size=5, depth=args.n_layer, n_symbols=args.n_token),
             style_encoder   = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim),# acoustic style encoder
-            text_aligner    = ASRCNN(input_dim=args.ASR_params.input_dim, hidden_dim=args.ASR_params.hidden_dim, n_token=args.ASR_params.n_token,
+            text_aligner    = ASRCNN(input_dim=args.ASR_params.input_dim, hidden_dim=args.ASR_params.hidden_dim, n_token=args.n_token,
                                    n_layers=args.ASR_params.n_layers, token_embedding_dim=args.ASR_params.token_embedding_dim), #ASR
             pitch_extractor = JDCNet(num_class=args.JDC_params.num_class, seq_len=args.JDC_params.seq_len), #F0
 
@@ -610,23 +610,23 @@ def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_module
                     model[key].load_state_dict(new_state_dict, strict=True)# load params
                 else:
                     print(e)
-            print('%s LOADED' % key)
+            print('%s Loaded' % key)
         if key in freeze_modules:
             for param in model[key].parameters():
                 param.requires_grad = False
-            print('%s FREEZED\n' % key)
+            print('%s Freezed' % key)
         if key in ignore_modules:
-            print('%s IGNORED\n' % key)
+            print('%s Ignored' % key)
+
     _ = [model[key].eval() for key in model]
     
-
     if not load_only_params:
-        print('LOADING OLD OPTIMIZER')
+        print('\nLoading old optimizer')
         epoch = state["epoch"]
         iters = state["iters"]
         optimizer.load_state_dict(state["optimizer"])
     else:
-        print('NOT LOADING OLD OPTIMIZER')
+        print('\nNOT Loading old optimizer')
         epoch = 0
         iters = 0
 
