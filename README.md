@@ -12,7 +12,7 @@ _If you have a better checkpoint, your contribution would be greatly appreciated
 - Vietnamese checkpoint (viVoice 120,000 steps): [Download (CC BY NC 4.0 SA)](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/tree/main/Models)
 - viVoice dataset: [Download (CC BY NC 4.0 SA)](https://huggingface.co/datasets/capleaf/viVoice) 
 - Demo: [StyleTTS2-lite-vi-space](https://huggingface.co/spaces/dangtr0408/StyleTTS2-lite-vi-space)
-- Extended vocabulary: 189 tokens (see [inference.py L38–42](https://huggingface.co/dangtr0408/StyleTTS2-lite-vi/blob/main/inference.py#L38-L42)). To continue training, add these tokens to [***meldataset.py***](https://github.com/dangtr0408/StyleTTS2-lite/blob/e39072d03f3a406790809fe80f83df5aaf5342b7/meldataset.py#L23-L38).
+- Extended to 189 tokens.
 
 Model Component Parameter Summary
 
@@ -31,33 +31,37 @@ Model Component Parameter Summary
 
 ## How To Start Finetuning
 
-**1. Install the requirements**
+**1. Install The requirements**
 ```bash
 pip  install  -r  requirements.txt
 ```
 
-**2. Download model and config file**
+**2. Download Model And Config File**
 
 Download and place the base model in ***/Models/Finetune*** and the corresponding config file in ***/Configs***.
 
-**3. Format your data like StyleTTS2, but exclude the speaker field.**
+**3. Format Your Dataset.**
 
 Format: filename.wav | transcription
 
 For reference, see ***val.txt*** in [LibriTTS dataset](https://huggingface.co/datasets/dangtr0408/LibriTTS-clean-460/tree/main).
 
-**4. (Optional) Extend the token set**
+**4. (Optional) Extend The Token Set To Support Additional Languages**
 
-If you want to add new tokens to train on another language:
-- Make sure that you did step 2.
-- Open extend.ipynb, edit the number of tokens you would like to extend to and run the notebook.
-- Find the new weights and configs in ***/Extend/New_Weights/***, then replace the originals.
-- Add your new IPA symbols to the _extend list in meldataset.py ⚠️ Ensure the total number of symbols in meldataset.py matches your extended token count!
-- (Note) If you are using my **inference.py from StyleTTS2-lite-vi on HuggingFace** make sure to update it with new IPA list as well.
+If you plan to train on a new language with symbols not included in the original token set (see config file that comes with the pretrained you downloaded), follow these steps after completing step 2.
 
-**5. Adjust your configs file**
+- Locate the ***extend.ipynb***, set the "extend_to" variable to the total number of symbols you want to support (including the new ones), then run the notebook. You may over-extend (i.e reserve extra slots beyond your current needs), but it's strongly recommended to only extend up to the actual number of new symbols you plan to use to avoid unnecessary memory usage or complexity.
+- Find the extended weights in ***/Extend/New_Weights/***, replace the original weights with it.
+- Add new symbols to the "_extend_list" in the config file. You may also want to set:
+<pre lang="yaml">
+load_only_params: true
+#Prevent loading old optimizer state
+</pre>
+- ⚠️ Important: *Do not add any new symbols to the config file ***before running extend.ipynb***. This will lead to misalignment between the model and the symbol set.*
 
-For a single GPU with 24 GB VRAM, i find the following works well. Some users have reported that setting max_len below 300 can slightly degrade quality. Personally, I haven’t encountered any issues even with max_len 180.
+**5. Adjust Your Configs File**
+
+For a single GPU with 24 GB VRAM, i find the following works well.
 <pre lang="yaml">
 batch_size: 2 
 max_len: 310 # maximum number of frames
@@ -71,6 +75,8 @@ data_params:
   root_path: ../Data_Speech/
 </pre>
 
+
+
 **6. Start training**
 ```bash
 python train.py
@@ -83,7 +89,7 @@ python train.py
 
 ## References
 
-- [yl4579/StyleTTS2](https://arxiv.org/abs/2306.07691)
+- [yl4579/StyleTTS2](https://github.com/yl4579/StyleTTS2)
 
 - [jik876/hifi-gan](https://github.com/jik876/hifi-gan)
 
