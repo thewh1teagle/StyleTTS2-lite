@@ -20,14 +20,14 @@ def main():
     models_path = str(Path('Models') / 'Finetune/base_model.pth')
     model = StyleTTS2(config_path, models_path).eval().to(device)
     
-    phonemes = 'ʃalˈom uvraxˈa mˈa korˈe ʔˈejx ʔatˈa margˈiʃ hajˈom? nosʔˈim jekarˈim, harakˈevet tagˈiʔa lejeruʃalˈajim.'
+    phonemes = 'nosʔˈim jekarˈim, harakˈevet tagˈiʔa lejeruʃalˈajim beʔˈod mispˈar dakˈot. ʔˈana hitkonenˈu lejeridˈa meharakˈevet, lˈo liʃkˈoax lakˈaxat ʔˈet advarˈim ʃelaxˈem!'
     speed = 1
     denoise = 0.2
     avg_style = True
     stabilize = True
 
     speaker = {
-        "path": 'Demo/Audio/7_alloy.wav',
+        "path": 'Demo/Audio/10_michael.wav',
         "speed": speed
     }
 
