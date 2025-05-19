@@ -1,30 +1,25 @@
 """
 uv run Demo/infer.py
 """
-#import libs
 import soundfile as sf
-import os
 import sys
 import torch
-import traceback
-import random
 import numpy as np
 from pathlib import Path
-device = 'cuda' if torch.cuda.is_available() else 'cpu' #setup GPU
 
-#import inference
+
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
-
 from inference import StyleTTS2
-#########################################CHANGE YOUR PATH HERE#########################################
-config_path = str(Path("Configs") / "config.yaml")
-models_path = str(Path('Models') / 'Finetune/base_model.pth')
-#######################################################################################################
-voice_path = str(Path("Demo") / "Audio")
-model = StyleTTS2(config_path, models_path).eval().to(device)
+
+
 
 def main():
+    device = 'cuda' if torch.cuda.is_available() else 'cpu' #setup GPU
+    config_path = str(Path("Configs") / "config.yaml")
+    models_path = str(Path('Models') / 'Finetune/base_model.pth')
+    model = StyleTTS2(config_path, models_path).eval().to(device)
+    
     phonemes = 'ðə mjuːzˈiəm ɡˈɑːɹd nˈɛvɚɹ ɛkspˈɛktᵻd ðə skˈʌlptʃɚ tə mˈuːv, bˌʌt æt pɹɪsˈaɪsli mˈɪdnaɪt, ɪts ˈaɪz blˈɪŋkt, ænd ɪts lˈɪps kˈɜːld ˌɪntʊ ɐ nˈoʊɪŋ smˈaɪl, æz ɪf ɐwˈeɪkənɪŋ fɹʌm sˈɛntʃɚɹiz ʌv sˈaɪləns.'
     speed = 1
     denoise = 0.2
