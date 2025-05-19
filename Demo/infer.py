@@ -20,7 +20,7 @@ def main():
     models_path = str(Path('Models') / 'Finetune/base_model.pth')
     model = StyleTTS2(config_path, models_path).eval().to(device)
     
-    phonemes = 'ðə mjuːzˈiəm ɡˈɑːɹd nˈɛvɚɹ ɛkspˈɛktᵻd ðə skˈʌlptʃɚ tə mˈuːv, bˌʌt æt pɹɪsˈaɪsli mˈɪdnaɪt, ɪts ˈaɪz blˈɪŋkt, ænd ɪts lˈɪps kˈɜːld ˌɪntʊ ɐ nˈoʊɪŋ smˈaɪl, æz ɪf ɐwˈeɪkənɪŋ fɹʌm sˈɛntʃɚɹiz ʌv sˈaɪləns.'
+    phonemes = 'ʃalˈom uvraxˈa mˈa korˈe ʔˈejx ʔatˈa margˈiʃ hajˈom? nosʔˈim jekarˈim, harakˈevet tagˈiʔa lejeruʃalˈajim.'
     speed = 1
     denoise = 0.2
     avg_style = True
