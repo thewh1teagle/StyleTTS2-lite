@@ -1,9 +1,8 @@
 """
-uv sync
-wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/base_model.pth
-wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/config.yaml
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/base_model.pth -O Models/base_model.pth
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/config.yaml -O Configs/config.yaml
 
-uv pip install onnx espeakng-loader phonemizer-fork
+uv sync --extra onnx --extra demo
 uv run ONNX/export_onnx.py
 """
 import torch

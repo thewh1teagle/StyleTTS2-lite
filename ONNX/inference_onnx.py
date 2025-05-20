@@ -1,3 +1,11 @@
+"""
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/base_model.pth -O Models/base_model.pth
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/config.yaml -O Configs/config.yaml
+
+uv sync --extra onnx --extra demo
+uv run ONNX/inference_onnx.py
+"""
+
 import torch
 import librosa
 import yaml

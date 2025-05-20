@@ -1,6 +1,8 @@
 """
-uv pip install -r ./Demo/requirements.txt
-uv pip install pandas
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/base_model.pth -O Models/base_model.pth
+wget https://huggingface.co/dangtr0408/StyleTTS2-lite/resolve/main/Models/config.yaml -O Configs/config.yaml
+
+uv sync --extra demo
 uv run Demo/infer.py
 """
 import soundfile as sf
