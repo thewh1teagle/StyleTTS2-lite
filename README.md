@@ -33,7 +33,7 @@ Model Component Parameter Summary
 
 **1. Install The requirements**
 ```bash
-pip  install  -r  requirements.txt
+pip install .
 ```
 
 **2. Download Model And Config File**

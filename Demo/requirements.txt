@@ -1,3 +1,0 @@
-noisereduce
-phonemizer      
-espeakng-loader
